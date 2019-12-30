@@ -77,10 +77,10 @@ public:
     ensurePositiveFinite(cov);
     computeSigmaPoints(mean, cov, sigma_points);
     for (int i = 0; i < S; i++) {
-      sigma_points.row(i) = system.f(sigma_points.row(i), control);
+      sigma_points.row(i) = system.f(sigma_points.row(i), control); // sigma_points.row(i).length()=16
     }
 
-    const auto& R = process_noise;
+    const auto& R = process_noise; //16*16
 
     // unscented transform
     VectorXt mean_pred(mean.size());
@@ -107,7 +107,7 @@ public:
    */
   void correct(const VectorXt& measurement) {
     // create extended state space which includes error variances
-    VectorXt ext_mean_pred = VectorXt::Zero(N + K, 1);
+    VectorXt ext_mean_pred = VectorXt::Zero(N + K, 1); // N:state dim=16; K:measurement dim=7;
     MatrixXt ext_cov_pred = MatrixXt::Zero(N + K, N + K);
     ext_mean_pred.topLeftCorner(N, 1) = VectorXt(mean);
     ext_cov_pred.topLeftCorner(N, N) = MatrixXt(cov);

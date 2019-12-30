@@ -73,7 +73,7 @@ public:
     double dt = (stamp - prev_stamp).toSec();
     prev_stamp = stamp;
 
-    ukf->setProcessNoiseCov(process_noise * dt);
+    ukf->setProcessNoiseCov(process_noise * dt); 
     ukf->system.dt = dt;
 
     Eigen::VectorXf control(6);
@@ -96,11 +96,13 @@ public:
     pcl::PointCloud<PointT>::Ptr aligned(new pcl::PointCloud<PointT>());
     registration->setInputSource(cloud);
     registration->align(*aligned, init_guess);
+    std::cout << "predict init_guess mat : \n" << init_guess << std::endl;
 
     Eigen::Matrix4f trans = registration->getFinalTransformation();
     Eigen::Vector3f p = trans.block<3, 1>(0, 3);
     Eigen::Quaternionf q(trans.block<3, 3>(0, 0));
 
+    // ??? for what reason
     if(quat().coeffs().dot(q.coeffs()) < 0.0f) {
       q.coeffs() *= -1.0f;
     }

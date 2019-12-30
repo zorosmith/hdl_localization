@@ -171,6 +171,7 @@ private:
     }
 
     publish_odometry(points_msg->header.stamp, pose_estimator->matrix());
+    std::cout << "refined localization : \n " << pose_estimator->matrix() << std::endl;
   }
 
   /**
