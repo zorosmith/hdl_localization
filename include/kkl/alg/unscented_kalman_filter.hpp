@@ -117,7 +117,7 @@ public:
     computeSigmaPoints(ext_mean_pred, ext_cov_pred, ext_sigma_points);
 
     // unscented transform
-    expected_measurements.setZero();
+    expected_measurements.setZero();//(2 * (N + K) + 1, K)
     for (int i = 0; i < ext_sigma_points.rows(); i++) {
       expected_measurements.row(i) = system.h(ext_sigma_points.row(i).transpose().topLeftCorner(N, 1));
       expected_measurements.row(i) += VectorXt(ext_sigma_points.row(i).transpose().bottomRightCorner(K, 1));
@@ -209,8 +209,8 @@ private:
     const int n = mean.size();
     assert(cov.rows() == n && cov.cols() == n);
 
-    Eigen::LLT<MatrixXt> llt;
-    llt.compute((n + lambda) * cov);
+    Eigen::LLT<MatrixXt> llt;//LLT分解。正定矩阵A可以唯一分解成下三角阵L和L的转置L^T相乘的形式
+    llt.compute((n + lambda) * cov);//保证cov正定
     MatrixXt l = llt.matrixL();
 
     sigma_points.row(0) = mean;

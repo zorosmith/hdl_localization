@@ -8,16 +8,16 @@
 
     <!-- globalmap_server_nodelet -->
     <node pkg="nodelet" type="nodelet" name="globalmap_server_nodelet" args="load hdl_localization/GlobalmapServerNodelet $(arg nodelet_manager)">
-      <param name="globalmap_pcd" value="$(find hdl_localization)/data/map.pcd" />
-      <param name="downsample_resolution" value="0.1" />
+      <param name="globalmap_pcd" value="$(find hdl_localization)/data/326slam.pcd" />
+      <param name="downsample_resolution" value="0.05" />
     </node>
 
     <!-- hdl_localization_nodelet -->
     <node pkg="nodelet" type="nodelet" name="hdl_localization_nodelet" args="load hdl_localization/HdlLocalizationNodelet $(arg nodelet_manager)">
         <!-- imu settings -->
         <!-- during "cool_time", imu inputs are ignored -->
-        <param name="use_imu" value="true" />
-        <param name="invert_imu" value="true" />
+        <param name="use_imu" value="false" />
+        <param name="invert_imu" value="false" />
         <param name="cool_time_duration" value="2.0" />
         <!-- ndt settings -->
         <!-- if NDT is slow for your PC, try DIRECT1 serach method, which is a bit unstable but extremely fast -->
@@ -34,5 +34,9 @@
         <param name="init_ori_x" value="0.0" />
         <param name="init_ori_y" value="0.0" />
         <param name="init_ori_z" value="0.0" />
+        <!-- limite lidar range -->
+        <param name="limited_range" value="true" />
+        <param name="range_thres" value="3.5" />
+        
     </node>
 </launch>

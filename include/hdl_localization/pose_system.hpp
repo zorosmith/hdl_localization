@@ -37,7 +37,7 @@ public:
     Vector3t raw_gyro = control.middleRows(3, 3);
 
     // position
-    next_state.middleRows(0, 3) = pt + vt * dt;					//
+    next_state.middleRows(0, 3) = pt + vt * dt;
 
     // velocity
     Vector3t g(0.0f, 0.0f, -9.80665f);

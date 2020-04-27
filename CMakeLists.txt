@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   ndt_omp
 )
 
+set(PCL_DIR "/usr/lib/x86_64-linux-gnu/cmake/pcl")
 find_package(PCL 1.7 REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})

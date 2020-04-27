@@ -22,6 +22,7 @@
 
 #include <hdl_localization/pose_estimator.hpp>
 
+#include <typeinfo>
 
 namespace hdl_localization {
 
@@ -55,6 +56,91 @@ public:
 
     pose_pub = nh.advertise<nav_msgs::Odometry>("/odom", 5, false);
     aligned_pub = nh.advertise<sensor_msgs::PointCloud2>("/aligned_points", 5, false);
+    colorProjectCloud_pub = nh.advertise<sensor_msgs::PointCloud2>("/colorProject_points", 5, false);
+  }
+
+  void removeFarPointCloud(const pcl::PointCloud<PointT> &cloud_in,
+                              pcl::PointCloud<PointT> &cloud_out, float thres) {
+    if (&cloud_in != &cloud_out)
+    {
+        cloud_out.header = cloud_in.header;
+        cloud_out.points.resize(cloud_in.points.size());
+    }
+
+    size_t j = 0;
+
+    for (size_t i = 0; i < cloud_in.points.size(); ++i)
+    {
+        if (cloud_in.points[i].x * cloud_in.points[i].x + cloud_in.points[i].y * cloud_in.points[i].y + cloud_in.points[i].z * cloud_in.points[i].z > thres * thres)
+            continue;
+        cloud_out.points[j] = cloud_in.points[i];
+        j++;
+    }
+    if (j != cloud_in.points.size())
+    {
+        cloud_out.points.resize(j);
+    }
+
+    cloud_out.height = 1;
+    cloud_out.width = static_cast<uint32_t>(j);
+    cloud_out.is_dense = true;
+  }
+
+  void removeBehindPointCloud(const pcl::PointCloud<PointT> &cloud_in,
+                                pcl::PointCloud<pcl::PointXYZRGB> &colorCloud,
+                                pcl::PointCloud<PointT> &xyziCloud) {
+      float horizonAngle;
+      size_t columnIdn;
+      PointT thisPoint;
+      pcl::PointXYZRGB colorPoint;
+      size_t cloudSize = cloud_in.points.size();
+
+      for (size_t i = 0; i < cloudSize; ++i) {
+          thisPoint.x = cloud_in.points[i].x;
+          thisPoint.y = cloud_in.points[i].y;
+          thisPoint.z = cloud_in.points[i].z;
+          thisPoint.intensity = cloud_in.points[i].intensity;
+
+          horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
+          columnIdn = -round( (horizonAngle-90.0)/0.2 ) + 1800/2;  // 0.2是lidar在水平方向分辨率，1800是lidar在水平方向的划分
+          if(columnIdn >= 1800)
+              columnIdn -= 1800;
+
+          if(columnIdn < 0 || columnIdn >= 1800)
+              continue;
+
+          // 可视化彩色点云
+          if(columnIdn < 600) {
+              colorPoint.x = thisPoint.x;
+              colorPoint.y = thisPoint.y;
+              colorPoint.z = thisPoint.z;
+              colorPoint.r = 255;
+              colorPoint.g = 0;
+              colorPoint.b = 0;
+          }
+          else if(columnIdn > 1200) {
+              colorPoint.x = thisPoint.x;
+              colorPoint.y = thisPoint.y;
+              colorPoint.z = thisPoint.z;
+              colorPoint.r = 0;
+              colorPoint.g = 255;
+              colorPoint.b = 0;
+          }
+          else {
+              colorPoint.x = thisPoint.x;
+              colorPoint.y = thisPoint.y;
+              colorPoint.z = thisPoint.z;
+              colorPoint.r = 0;
+              colorPoint.g = 0;
+              colorPoint.b = 255;
+          }
+          colorCloud.push_back(colorPoint);
+
+          if(columnIdn < 450 || columnIdn > 1350)   //lidar后方90°范围
+              continue;
+
+          xyziCloud.push_back(thisPoint);
+      }
   }
 
 private:
@@ -135,7 +221,28 @@ private:
       return;
     }
 
-    auto filtered = downsample(cloud);
+    // 注释掉降采样操作
+    // auto filtered = downsample(cloud);
+    pcl::PointCloud<PointT>::Ptr filtered = cloud;
+
+    // limit the lidar range
+    bool limited_range = private_nh.param<bool>("limited_range", false);
+    float range_thres = private_nh.param<double>("range_thres", 2.0);
+    if(limited_range) {
+      removeFarPointCloud(*filtered, *filtered, range_thres);
+    }
+
+    // 移除lidar后方指定角度范围内的点云
+    pcl::PointCloud<PointT>::Ptr limitAngleCloud(new pcl::PointCloud<PointT>());
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr colorPointcloud(new pcl::PointCloud<pcl::PointXYZRGB>());
+    removeBehindPointCloud(*filtered, *colorPointcloud, *limitAngleCloud);
+    
+    colorPointcloud->header.frame_id = "velodyne";
+    colorPointcloud->header.stamp = cloud->header.stamp;
+
+    sensor_msgs::PointCloud2 pubCloud;
+    pcl::toROSMsg(*colorPointcloud, pubCloud);
+    colorProjectCloud_pub.publish(pubCloud);
 
     // predict
     if(!use_imu) {
@@ -157,7 +264,7 @@ private:
 
     // correct
     auto t1 = ros::WallTime::now();
-    auto aligned = pose_estimator->correct(filtered);
+    auto aligned = pose_estimator->correct(limitAngleCloud);
     auto t2 = ros::WallTime::now();
 
     processing_time.push_back((t2 - t1).toSec());
@@ -171,7 +278,7 @@ private:
     }
 
     publish_odometry(points_msg->header.stamp, pose_estimator->matrix());
-    std::cout << "refined localization : \n " << pose_estimator->matrix() << std::endl;
+    // std::cout << "refined localization : \n " << pose_estimator->matrix() << std::endl;
   }
 
   /**
@@ -211,7 +318,8 @@ private:
    * @param cloud   input cloud
    * @return downsampled cloud
    */
-  pcl::PointCloud<PointT>::ConstPtr downsample(const pcl::PointCloud<PointT>::ConstPtr& cloud) const {
+  //pcl::PointCloud<PointT>::ConstPtr downsample(const pcl::PointCloud<PointT>::ConstPtr& cloud) const {
+  pcl::PointCloud<PointT>::Ptr downsample(const pcl::PointCloud<PointT>::Ptr& cloud) const {
     if(!downsample_filter) {
       return cloud;
     }
@@ -297,6 +405,7 @@ private:
 
   ros::Publisher pose_pub;
   ros::Publisher aligned_pub;
+  ros::Publisher colorProjectCloud_pub;
   tf::TransformBroadcaster pose_broadcaster;
 
   // imu input buffer
